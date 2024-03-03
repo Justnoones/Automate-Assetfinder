@@ -23,7 +23,10 @@ rm "$domain_name/recon/assets.txt"
 
 # Harvest subdomains with Amass
 echo "[+] Harvesting subdomains with Amass..."
-amass enum -d "$1" >> "$domain_name/recon/assets.txt"
+# Add a timeout of 5 minutes (300 seconds) to Amass command
+echo "[+] Amass may took too long to complete."
+timeout 300 amass enum -d "$1" >> "$domain_name/recon/assets.txt"
+
 sort -u "$domain_name/recon/assets.txt" >> "$domain_name/recon/${domain_name}-sub-domains.txt"
 
 # Clean up temporary files 
@@ -33,5 +36,10 @@ rm "$domain_name/recon/assets.txt"
 echo "[+] Probing for alive domains..."
 httprobe < "$domain_name/recon/${domain_name}-sub-domains.txt" | sed 's/https\?:\/\///' | tr -d ':443' > "$domain_name/recon/alive_${domain_name}-sub-domains.txt"
 
+# Capture screenshots using GoWitness
+echo "[+] Capturing screenshots with GoWitness..."
+gowitness file -f "$domain_name/recon/alive_${domain_name}-sub-domains.txt" -P "$domain_name/recon/screenshots/"
+
 echo "[+] Subdomains saved to $domain_name/recon/${domain_name}-sub-domains.txt"
 echo "[+] Active Subdomains saved to $domain_name/recon/alive_${domain_name}-sub-domains.txt"
+echo "[+} Screenshots savded to  $domain_name/recon/screenshots"

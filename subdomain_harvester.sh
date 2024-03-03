@@ -25,5 +25,10 @@ rm "$domain_name/recon/assets.txt"
 echo "[+] Probing for alive domains..."
 httprobe < "$domain_name/recon/${domain_name}-sub-domains.txt" | sed 's/https\?:\/\///; s/:443//' > "$domain_name/recon/alive_${domain_name}-sub-domains.txt"
 
+# Capture screenshots using GoWitness
+echo "[+] Capturing screenshots with GoWitness..."
+gowitness file -f "$domain_name/recon/alive_${domain_name}-sub-domains.txt" -P "$domain_name/recon/screenshots/"
+
 echo "[+] Subdomains saved to $domain_name/recon/${domain_name}-sub-domains.txt"
 echo "[+] Active Subdomains saved to $domain_name/recon/alive_${domain_name}-sub-domains.txt"
+echo "[+} Screenshots savded to  $domain_name/recon/screenshots"
