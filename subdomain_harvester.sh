@@ -2,7 +2,7 @@
 
 # Check if domain argument is provided
 if [ -z "$1" ]; then
-    echo "Usage: subdomain_harvester.sh <domain>"
+    echo "Usage: subdomain_harvester-2.0.sh <domain>"
     exit 1
 fi
 
@@ -15,20 +15,44 @@ mkdir -p "$domain_name/recon"
 echo "[+] Harvesting subdomains with assetfinder..."
 assetfinder "$1" >> "$domain_name/recon/assets.txt"
 
+# Harvest subdomains with Sublist3r
+echo "[+] Harvesting subdomains with Sublist3r..."
+sublist3r -d "$1" >> "$domain_name/recon/assets.txt"
+
+# Harvest subdomains with Subfinder
+echo "[+] Harvesting subdomains with Subfinder..."
+subfinder -d "$1" >> "$domain_name/recon/assets.txt"
+
+# Run MassDNS to resolve discovered subdomains
+echo "[+] Resolving discovered subdomains with MassDNS..."
+massdns -r ~/tools/massdns/lists/resolvers.txt -t A -o S -w "$domain_name/recon/massdns.txt" "$domain_name/recon/assets.txt"
+
 # Filter and store unique subdomains
-sort -u "$domain_name/recon/assets.txt" | grep "$1" > "$domain_name/recon/${domain_name}-sub-domains.txt"
+sort -u "$domain_name/recon/assets.txt" >> "$domain_name/recon/${domain_name}-sub-domains.txt"
 
-# Clean up temporary files
-rm "$domain_name/recon/assets.txt"
+# Check for possible subdomain takeover
+echo "[+] Checking for possible subdomain takeover..."
+subjack -w "$domain_name/recon/${domain_name}-sub-domains.txt" -t 100 -timeout 30 -ssl -c ~/tools/subjack/fingerprints.json -v -o "$domain_name/recon/subdomain_takeover.txt"
 
-# Filter alive https
-echo "[+] Probing for alive domains..."
-httprobe < "$domain_name/recon/${domain_name}-sub-domains.txt" | sed 's/https\?:\/\///; s/:443//' > "$domain_name/recon/alive_${domain_name}-sub-domains.txt"
+# Scan for open ports
+echo "[+] Scanning for open ports..."
+nmap -iL "$domain_name/recon/${domain_name}-sub-domains.txt" -T4 -oA "$domain_name/recon/nmap_scan"
 
-# Capture screenshots using GoWitness
-echo "[+] Capturing screenshots with GoWitness..."
-gowitness file -f "$domain_name/recon/alive_${domain_name}-sub-domains.txt" -P "$domain_name/recon/screenshots/"
+# Scraping Wayback Machine data
+echo "[+] Scraping Wayback Machine data..."
+cat "$domain_name/recon/${domain_name}-sub-domains.txt" | waybackurls >> "$domain_name/recon/wayback_data.txt"
+
+# Pulling and compiling all possible params found in Wayback data
+echo "[+] Pulling and compiling all possible params found in Wayback data..."
+cat "$domain_name/recon/wayback_data.txt" | grep -Eo '(http|https)://[^/"]+/?' | sort -u | while read line; do parameth -u "$line" -o "$domain_name/recon/wayback_params"; done
+
+# Pulling and compiling js/php/aspx/jsp/json files from Wayback output
+echo "[+] Pulling and compiling js/php/aspx/jsp/json files from Wayback output..."
+cat "$domain_name/recon/wayback_data.txt" | grep -E "\.js|\.php|\.aspx|\.jsp|\.json" | sort -u >> "$domain_name/recon/wayback_files.txt"
 
 echo "[+] Subdomains saved to $domain_name/recon/${domain_name}-sub-domains.txt"
-echo "[+] Active Subdomains saved to $domain_name/recon/alive_${domain_name}-sub-domains.txt"
-echo "[+} Screenshots savded to  $domain_name/recon/screenshots"
+echo "[+] Possible subdomain takeover saved to $domain_name/recon/subdomain_takeover.txt"
+echo "[+] Nmap scan results saved to $domain_name/recon/nmap_scan"
+echo "[+] Wayback Machine data saved to $domain_name/recon/wayback_data.txt"
+echo "[+] Wayback params saved to $domain_name/recon/wayback_params"
+echo "[+] Wayback files saved to $domain_name/recon/wayback_files.txt"
